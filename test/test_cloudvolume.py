@@ -11,7 +11,7 @@ import sys
 from functools import reduce
 
 from cloudvolume.exceptions import AlignmentError
-from cloudvolume import CloudVolume, chunks, Storage
+from cloudvolume import CloudVolume, chunks, Storage, view
 from cloudvolume.lib import mkdir, Bbox, Vec, yellow
 import cloudvolume.sharedmemory as shm
 from layer_harness import (
@@ -146,8 +146,13 @@ def test_parallel_write():
   
   # aligned write
   cv.parallel = 2
+  cv.progress = True
   cv[:] = np.zeros(shape=(512,512,128,1), dtype=cv.dtype) + 5
   data = cv[:]
+
+  view(data)
+  view(data == 5)
+
   assert np.all(data == 5)
 
   # non-aligned-write
