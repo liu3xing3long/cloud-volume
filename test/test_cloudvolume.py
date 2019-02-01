@@ -150,9 +150,6 @@ def test_parallel_write():
   cv[:] = np.zeros(shape=(512,512,128,1), dtype=cv.dtype) + 5
   data = cv[:]
 
-  view(data)
-  view(data == 5)
-
   assert np.all(data == 5)
 
   # non-aligned-write
