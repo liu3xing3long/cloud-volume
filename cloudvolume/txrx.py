@@ -5,9 +5,6 @@ import concurrent.futures
 import os
 import signal
 
-import gevent
-import gevent.pool
-
 import numpy as np
 from six.moves import range
 from tqdm import tqdm
@@ -21,6 +18,7 @@ from .lib import (
   Bbox, min2, max2, check_bounds, 
   jsonify, generate_slices
 )
+from .scheduler import schedule_jobs
 from .storage import Storage, SimpleStorage, DEFAULT_THREADS, reset_connection_pools
 from .volumecutout import VolumeCutout
 from . import sharedmemory as shm
@@ -70,6 +68,7 @@ def parallel_execution(fn, items, parallel, cleanup_shm=None):
   signal.signal(signal.SIGTERM, cleanup)
 
   with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as executor:
+    print("here")
     executor.map(fn, items)
 
   signal.signal(signal.SIGINT, prevsigint)
@@ -139,11 +138,11 @@ def cutout(vol, requested_bbox, steps, channel_slice=slice(None), parallel=1,
   return VolumeCutout.from_volume(vol, renderbuffer, requested_bbox, handle=handle)
 
 def download_single(vol, cloudpath, filename, cache):
-  with SimpleStorage(cloudpath) as stor:
+  with Storage(cloudpath) as stor:
     content = stor.get_file(filename)
 
   if cache:
-    with SimpleStorage('file://' + vol.cache.path) as stor:
+    with Storage('file://' + vol.cache.path) as stor:
       stor.put_file(
         file_path=filename, 
         content=(content or b''), 
@@ -159,22 +158,19 @@ def download_multiple(vol, cloudpaths, fn):
   locations = vol.cache.compute_data_locations(cloudpaths)
   cachedir = 'file://' + os.path.join(vol.cache.path, vol.key)
 
-  pbar = tqdm(total=len(cloudpaths), desc='Downloading', disable=(not vol.progress))
-
   def process(cloudpath, filename, cache):
     img3d, bbox = download_single(vol, cloudpath, filename, cache)
     fn(img3d, bbox)
-    pbar.update(1)
 
-  downloads = [ (cachedir, filename, False) for filename in locations['local'] ]
-  downloads += [ (vol.layer_cloudpath, filename, vol.cache.enabled) for filename in locations['remote'] ]
+  downloads = [ partial(process, cachedir, filename, False) for filename in locations['local'] ]
+  downloads += [ partial(process, vol.layer_cloudpath, filename, vol.cache.enabled) for filename in locations['remote'] ]
 
-  pool = gevent.pool.Pool(DEFAULT_THREADS)
-  for cpath, fname, cache in downloads:
-    pool.spawn(process, cpath, fname, cache)
-  pool.join()
-  pool.kill()
-  pbar.close()
+  schedule_jobs(
+    fns=downloads, 
+    concurrency=DEFAULT_THREADS, 
+    progress=('Downloading' if vol.progress else None),
+    total=len(cloudpaths)
+  )
   
 def decode(vol, filename, content):
   """Decode content according to settings in a cloudvolume instance."""
@@ -356,12 +352,17 @@ def upload_aligned(vol, img, offset, parallel=1,
     array_like.close()
     shm.unlink(vol.shared_memory_id)
 
-def multi_process_upload(vol, img_shape, offset, 
-  shared_memory_id, manual_shared_memory_bbox, manual_shared_memory_order, caching, chunk_ranges):
+def multi_process_upload(
+    vol, img_shape, offset, 
+    shared_memory_id, manual_shared_memory_bbox, 
+    manual_shared_memory_order, caching, 
+    chunk_ranges
+  ):
   global fs_lock
   reset_connection_pools()
   vol.init_submodules(caching)
-  gevent.monkey.patch_all()
+  # Do not monkey patch here. It causes the 
+  # child process to abort.
 
   shared_shape = img_shape
   if manual_shared_memory_bbox:

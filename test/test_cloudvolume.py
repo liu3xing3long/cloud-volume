@@ -143,7 +143,7 @@ def test_parallel_read():
 def test_parallel_write():
   delete_layer()
   cv, data = create_layer(size=(512,512,128,1), offset=(0,0,0))
-  
+
   # aligned write
   cv.parallel = 2
   cv.progress = True
