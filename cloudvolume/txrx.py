@@ -68,7 +68,6 @@ def parallel_execution(fn, items, parallel, cleanup_shm=None):
   signal.signal(signal.SIGTERM, cleanup)
 
   with concurrent.futures.ProcessPoolExecutor(max_workers=parallel) as executor:
-    print("here")
     executor.map(fn, items)
 
   signal.signal(signal.SIGINT, prevsigint)
@@ -138,11 +137,11 @@ def cutout(vol, requested_bbox, steps, channel_slice=slice(None), parallel=1,
   return VolumeCutout.from_volume(vol, renderbuffer, requested_bbox, handle=handle)
 
 def download_single(vol, cloudpath, filename, cache):
-  with Storage(cloudpath) as stor:
+  with SimpleStorage(cloudpath) as stor:
     content = stor.get_file(filename)
 
   if cache:
-    with Storage('file://' + vol.cache.path) as stor:
+    with SimpleStorage('file://' + vol.cache.path) as stor:
       stor.put_file(
         file_path=filename, 
         content=(content or b''), 
