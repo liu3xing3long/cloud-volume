@@ -146,7 +146,6 @@ def test_parallel_write():
 
   # aligned write
   cv.parallel = 2
-  cv.progress = True
   cv[:] = np.zeros(shape=(512,512,128,1), dtype=cv.dtype) + 5
   data = cv[:]
 
