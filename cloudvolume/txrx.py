@@ -1,4 +1,5 @@
 from functools import partial
+import itertools
 import math
 import multiprocessing as mp
 import concurrent.futures
@@ -161,8 +162,10 @@ def download_multiple(vol, cloudpaths, fn):
     img3d, bbox = download_single(vol, cloudpath, filename, cache)
     fn(img3d, bbox)
 
-  downloads = [ partial(process, cachedir, filename, False) for filename in locations['local'] ]
-  downloads += [ partial(process, vol.layer_cloudpath, filename, vol.cache.enabled) for filename in locations['remote'] ]
+  local_downloads = ( partial(process, cachedir, filename, False) for filename in locations['local'] )
+  remote_downloads = ( partial(process, vol.layer_cloudpath, filename, vol.cache.enabled) for filename in locations['remote'] )
+
+  downloads = itertools.chain( local_downloads, remote_downloads )
 
   schedule_jobs(
     fns=downloads, 
