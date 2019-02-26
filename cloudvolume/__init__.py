@@ -1,9 +1,3 @@
-import sys
-
-if sys.version_info[0] >= 3:
-  import gevent.monkey
-  gevent.monkey.patch_all()
-
 from .connectionpools import ConnectionPool
 from .cloudvolume import CloudVolume
 from .lib import Bbox
