@@ -86,8 +86,10 @@ def multi_process_download(cv, bufferbbox, caching, cloudpaths):
   download_multiple(cv, cloudpaths, fn=process)
   array_like.close()
 
-def multi_process_cutout(vol, requested_bbox, cloudpaths, parallel, 
-  shared_memory_location, output_to_shared_memory):
+def multi_process_cutout(
+    vol, requested_bbox, cloudpaths, parallel, 
+    shared_memory_location, output_to_shared_memory
+  ):
   global fs_lock
 
   cloudpaths_by_process = []
@@ -107,8 +109,11 @@ def multi_process_cutout(vol, requested_bbox, cloudpaths, parallel,
 
   return mmap_handle, renderbuffer
 
-def cutout(vol, requested_bbox, steps, channel_slice=slice(None), parallel=1, 
-  shared_memory_location=None, output_to_shared_memory=False):
+def cutout(
+    vol, requested_bbox, steps, 
+    channel_slice=slice(None), parallel=1, 
+    shared_memory_location=None, output_to_shared_memory=False
+  ):
   """Cutout a requested bounding box from storage and return it as a numpy array."""
   global fs_lock
 
@@ -274,8 +279,13 @@ def check_grid_aligned(vol, img, offset):
   is_aligned = np.all(alignment_check.minpt == bounds.minpt) and np.all(alignment_check.maxpt == bounds.maxpt)
   return (is_aligned, bounds, alignment_check) 
 
-def upload_image(vol, img, offset, parallel=1, 
-  manual_shared_memory_id=None, manual_shared_memory_bbox=None, manual_shared_memory_order='F'):
+def upload_image(
+    vol, img, offset, 
+    parallel=1, 
+    manual_shared_memory_id=None, 
+    anual_shared_memory_bbox=None, 
+    manual_shared_memory_order='F'
+  ):
   """Upload img to vol with offset. This is the primary entry point for uploads."""
   global NON_ALIGNED_WRITE
 
@@ -317,8 +327,13 @@ def upload_image(vol, img, offset, parallel=1,
 
   download_multiple(vol, shell_chunks, fn=shade_and_upload)
 
-def upload_aligned(vol, img, offset, parallel=1, 
-  manual_shared_memory_id=None, manual_shared_memory_bbox=None, manual_shared_memory_order='F'):
+def upload_aligned(
+    vol, img, offset, 
+    parallel=1, 
+    manual_shared_memory_id=None, 
+    manual_shared_memory_bbox=None, 
+    manual_shared_memory_order='F'
+  ):
   global fs_lock
 
   chunk_ranges = list(generate_chunks(vol, img, offset))
