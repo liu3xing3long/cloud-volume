@@ -4,13 +4,13 @@ from six.moves import range, reduce
 from collections import namedtuple
 import json
 import os
-import io
 import re 
 import sys
 import math
-import shutil
 import operator
 import time
+import random
+import string 
 from itertools import product
 
 import numpy as np
@@ -106,6 +106,10 @@ def extract_bucket_path(cloudpath):
   cloudpath = re.sub(bucket_re, '', cloudpath)
 
   return BucketPath(protocol, bucket, cloudpath)
+
+def generate_random_string(size=6):
+  return ''.join(random.SystemRandom().choice(string.ascii_lowercase + \
+                  string.digits) for _ in range(size))
 
 def extract_path(cloudpath):
   """cloudpath: e.g. gs://neuroglancer/DATASET/LAYER/info or s3://..."""
@@ -352,11 +356,6 @@ class Bbox(object):
   def dtype(self):
     return self._dtype
 
-  def astype(self, dtype):
-    self._dtype = np.dtype(dtype)
-    self.minpt = self.minpt.astype(self.dtype)
-    self.maxpt = self.maxpt.astype(self.dtype)
-
   @classmethod
   def intersection(cls, bbx1, bbx2):
     if not Bbox.intersects(bbx1, bbx2):
@@ -409,6 +408,10 @@ class Bbox(object):
       return Bbox.from_dict(obj)
     else:
       raise NotImplementedError("{} is not a Bbox convertible type.".format(typ))
+
+  @classmethod
+  def from_delta(cls, minpt, plus):
+    return Bbox( minpt, Vec(*minpt) + plus )
 
   @classmethod
   def from_dict(cls, data):
@@ -519,7 +522,10 @@ class Bbox(object):
     return np.all(self.minpt <= self.maxpt)
 
   def volume(self):
-    return self.size3().rectVolume()
+    if np.issubdtype(self.dtype, np.integer):
+      return self.size3().astype(np.int64).rectVolume()
+    else:
+      return self.size3().astype(np.float64).rectVolume()
 
   def center(self):
     return (self.minpt + self.maxpt) / 2.0
@@ -619,21 +625,15 @@ class Bbox(object):
   def contains_bbox(self, bbox):
     return self.contains(bbox.minpt) and self.contains(bbox.maxpt)
 
+  def clone(self):
+    return Bbox(self.minpt, self.maxpt, dtype=self.dtype)
+
   def astype(self, typ):
     tmp = self.clone()
     tmp.minpt = tmp.minpt.astype(typ)
     tmp.maxpt = tmp.maxpt.astype(typ)
-    tmp.dtype = tmp.minpt.dtype 
+    tmp._dtype = tmp.minpt.dtype 
     return tmp
-
-  def clone(self):
-    return Bbox(self.minpt, self.maxpt, dtype=self.dtype)
-
-  def astype(self, dtype):
-    result = self.clone()
-    result.minpt = self.minpt.astype(dtype)
-    result.maxpt = self.maxpt.astype(dtype)
-    return result
 
   def transpose(self):
     return Bbox(self.minpt[::-1], self.maxpt[::-1])
@@ -828,8 +828,8 @@ def save_images(image, directory=None, axis='z', channel=None, global_norm=True,
     img = (img - lower) / (upper - lower) * 255.0
     return img.astype(np.uint8)
 
-  if global_norm and image.dtype in (np.floating,):
-    image = normalize_float(image)
+  if global_norm and np.issubdtype(image.dtype, np.floating):
+    image = normalize_float(image)      
 
   for level in tqdm(range(image.shape[index]), desc="Saving Images"):
     if index == 0:
@@ -839,7 +839,7 @@ def save_images(image, directory=None, axis='z', channel=None, global_norm=True,
     elif index == 2:
       img = image[:, :, level, channel ]
     else:
-      raise NotImplemented
+      raise NotImplementedError
 
     num_channels = img.shape[2]
 
